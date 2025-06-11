@@ -2,7 +2,7 @@
 # Project by Kevin Schläpfer and Simon Bernhard
 
 
-# setwd("C:/Users/Simon Bernhard/OneDrive - Universitaet Bern/Dokumente/Studium/Sozialwissenschaften/HS23 SOWI/Computational social science - accessing and using digital data and technologies")
+# setwd("your working dictionary")
 
 library(httr)
 library(jsonlite)
@@ -101,7 +101,6 @@ r <- POST(
 
 print(content(r, "parsed")) # check if it worked
 
-
 # Downloading dataset -----------------------------------------------------
 library(readr)
 
@@ -121,10 +120,7 @@ if (status_code(r) == 200) {
 
 data <- read_delim("dataset.tsv.xz", delim = "\t", col_types = cols()) # decompress and load the dataset
 
-
 # Data tidying -------------------------------------------------------------
-
-
 articles <- data %>%
   select(
     ID = id,
@@ -141,13 +137,9 @@ articles <- articles %>%
 
 articles$text <- gsub("<.{0,6}>", "", articles$text) # deletes Javascript stuff
 
-
 # save(articles, file = "articles_raw_data.RData")
 
-
 # Build Corpus ------------------------------------------------------------
-
-
 library(htmltools)
 library(seededlda)
 library(quanteda)
@@ -159,7 +151,6 @@ if (!require("quanteda.sentiment")) {
 library(quanteda.sentiment)
 library(stopwords)
 library(scales)
-
 
 corpus_articles <-
   corpus(
@@ -177,10 +168,7 @@ corpus_articles <-
 
 # save(corpus_articles, file = "corpus_articles.RData")
 
-
 # Tokens ------------------------------------------------------------------
-
-
 articles_toks <- tokens(corpus_articles,
   what = c("word"),
   remove_separators = TRUE,
@@ -192,11 +180,7 @@ articles_toks <- tokens(corpus_articles,
   remove_hyphens = TRUE
 ) # tokenizing the new corpus, for better processable data
 
-
-
 # Data cleaning -----------------------------------------------------------
-
-
 mystopwords <- c(
   stopwords("de"), "dass", "SDA", "sda", "beim", "href", "fc",
   "dpa", "DPA", "seit", "pd", "mehr", "schon", "sei", "viel",
@@ -208,7 +192,6 @@ mystopwords <- c(
   "alt", "vre", "sowie", "wurde", "würde", "wurden", "gibt", "worden", "bild"
 ) # build a custom stopwords vector to remove them from tokens
 
-
 articles_toks <-
   articles_toks %>%
   tokens_remove(mystopwords,
@@ -219,7 +202,6 @@ articles_toks <-
   articles_toks %>%
   tokens_wordstem(language = "de") # stem tokens
 
-
 articles_toks <-
   articles_toks %>%
   tokens_remove(
@@ -227,11 +209,9 @@ articles_toks <-
     valuetype = "regex"
   ) # remove single character tokens
 
-
 articles_toks <-
   articles_toks %>%
   tokens_remove("") # remove empty tokens
-
 
 articles_toks <-
   articles_toks %>%
@@ -239,20 +219,12 @@ articles_toks <-
 
 # save(articles_toks, file = "articles_tokens.RData")
 
-
-
 # DFM ---------------------------------------------------------------------
-
-
 articles_dfm <- dfm(articles_toks) # build dfm
 
 # save(articles_dfm, file = "articles_dfm.RData")
 
-
-
 # LDA ---------------------------------------------------------------------
-
-
 set.seed(123)
 LDA <- textmodel_lda(articles_dfm, k = 10, max_iter = 100) # fit lda with k = 10 topics
 
@@ -268,7 +240,6 @@ df.articles$topic <- topics(LDA) # buid a dataframe with an added column contain
 filtered_articles <- df.articles %>%
   filter(topic == "topic3" | topic == "topic7" | topic == "topic10") # keep only the articles from the relevant topics
 
-
 filtered_articles <- filtered_articles %>%
   distinct(ID, .keep_all = T) # only keep articles with unique IDs (Live Ticker articles and articles which got updated several times
 # had the same ID for each version) to enable joining them with the original articles
@@ -276,22 +247,15 @@ filtered_articles <- filtered_articles %>%
 articles <- articles %>%
   distinct(ID, .keep_all = T) # delete articles with duplicate IDs in original dataset for the same reason as stated above
 
-
 filtered_original_articles <-
   semi_join(articles, filtered_articles, by = "ID") # semijoin the articles filtered by relevant topic with the original versions
 # now we have a filtered dataset with only the relevant articles
 
-
 filtered_original_articles <- cbind(filtered_original_articles, filtered_articles["topic"]) # add a column containing the LDA topic to the filtered original dataset
-
 
 # save(filtered_original_articles, file = "filtered_original_articles.RData")
 
-
-
 # corpus,tokens and dfm with the filtered dataset  -------------------------------
-
-
 corpus_filtered_articles <-
   corpus(
     select(
@@ -307,7 +271,6 @@ corpus_filtered_articles <-
     docid_field = "ID",
     unique_docnames = FALSE
   )
-
 
 filtered_articles_toks <- tokens(corpus_filtered_articles,
   what = c("word"),
@@ -330,7 +293,6 @@ filtered_articles_toks <-
   filtered_articles_toks %>%
   tokens_wordstem(language = "de") # stem tokens
 
-
 filtered_articles_toks <-
   filtered_articles_toks %>%
   tokens_remove(
@@ -338,24 +300,17 @@ filtered_articles_toks <-
     valuetype = "regex"
   ) # remove single character tokens
 
-
 filtered_articles_toks <-
   filtered_articles_toks %>%
   tokens_remove("") # remove empty tokens
-
 
 filtered_articles_toks <-
   filtered_articles_toks %>%
   tokens_tolower # transform tokens to lowercase
 
-
 dfm_filtered_articles <- dfm(filtered_articles_toks) # build dfm
 
-
-
 # Dictionary --------------------------------------------------------------
-
-
 sentim <- read.delim("https://github.com/guyemerson/SentiMerge/raw/master/data/sentimerge.txt", sep = "") # read in sentiment dictionary
 
 sentim <- sentim %>%
@@ -379,10 +334,7 @@ dict_negative <- dictionary(list(negative = senti_neg$word)) # create a negative
 
 final_dictionary <- dictionary(c(dict_positive, dict_negative)) # join them for the final dictionary
 
-
 # Apply dictionary --------------------------------------------------------
-
-
 sentiment <- dfm_filtered_articles %>%
   dfm_lookup(dictionary = final_dictionary) # apply the sentiment dictionary to the dfm
 
@@ -398,17 +350,11 @@ sentiment <- sentiment %>%
 
 summary(sentiment$sentiment.score.z) # check if all worked
 
-
-
 # prep for Analysis -------------------------------------------------------
-
-
 filtered_original_articles <- filtered_original_articles %>%
   mutate(ID = as.character(ID)) # format ID as character
 
 analysis <- left_join(filtered_original_articles, sentiment, by = "ID") # join sentiment and filtered articles
-
-
 
 # Immigration Data --------------------------------------------------------
 library(readxl)
@@ -456,8 +402,6 @@ asylum_statistic_origin <- asylum_statistic_origin %>%
   mutate(year_month = as.character(year_month)) %>%
   pivot_wider(names_from = Herkunft, values_from = value) # clean the data and pivot from wide to long
 
-
-
 # Regression Analysis -----------------------------------------------------
 library(stargazer)
 
@@ -488,14 +432,10 @@ summary(model2) # display both models
 regression_table1 <- stargazer(model1, type = "html", title = "Linear Regression Results", out = "regression_results1.html")
 regression_table2 <- stargazer(model2, type = "html", title = "Linear Regression Results", out = "regression_results2.html") # convert them to html code, to be able to use them in a paper
 
-
 # Visualization -----------------------------------------------------------
-
-
 library(ggplot2)
 library(hrbrthemes)
 library(viridis)
-
 
 # Barplot Frequencies of sentiments
 
@@ -521,9 +461,7 @@ analysis %>%
 
 # ggsave("barplot_distribution_senti_scores.png")
 
-
 # Lineplot showing the Frequencies of sentiment categories over time
-
 analysis %>%
   mutate(
     date = as.Date(date),
@@ -557,9 +495,7 @@ analysis %>%
 
 # ggsave("lineplot_freq_senti_score.png")
 
-
 # Stacked area plot showing the Frequencies of sentiment categories over time
-
 analysis %>%
   mutate(
     date = as.Date(date),
@@ -589,13 +525,9 @@ analysis %>%
   theme_ipsum() +
   theme(panel.border = element_rect(color = "black", fill = NA, size = 1))
 
-
 # ggsave("densitiy_plot_senti_score.png")
 
-
-
 # Line Plot showing the Average Sentiment Score Over Time
-
 ggplot(ra, aes(x = date, y = sentiment.score.z, group = 1)) +
   geom_line(color = "black", size = 1) +
   geom_smooth(color = "blue", size = 1) +
@@ -610,10 +542,7 @@ ggplot(ra, aes(x = date, y = sentiment.score.z, group = 1)) +
 
 # ggsave("lineplot_average_senti_score.png")
 
-
-
 # Line Plot showing the Correlation Over Time
-
 ggplot(
   ra %>%
     mutate(
@@ -635,6 +564,5 @@ ggplot(
   theme_bw() +
   scale_x_date(date_breaks = "1 year", date_labels = "%Y") + # Label every year on the x-axis
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate x-axis labels for better visibility
-
 
 # ggsave("lineplot_correlation.png")
